@@ -8,34 +8,25 @@ public class ApplicationContextBuilder
 {
     abstract class InternalBuilder
     {
-        public Type ShouldBuildFor = typeof(object);
-        public abstract IAsyncEnumerable<KeyValuePair<Type, object>> BuildFor<T>(IEnumerable<object> stuff);
+        public abstract IAsyncEnumerable<KeyValuePair<Type, object>> BuildFor(IEnumerable<object> objects);
     }
-
-
 
     abstract class BasedTypedInternalBuilder<T> : InternalBuilder
     {
-
-        public override IAsyncEnumerable<KeyValuePair<Type, object>> BuildFor<T1>(IEnumerable<object> stuff)
+        public override IAsyncEnumerable<KeyValuePair<Type, object>> BuildFor(IEnumerable<object> objects)
         {
-            if (typeof(T1) == ShouldBuildFor)
-            {
-                var result = new KeyValuePair<Type, object>(typeof(T), InternalBuild(stuff));
-                return AsyncEnumerable.Empty<KeyValuePair<Type, object>>().Append(result);
-            }
-            return AsyncEnumerable.Empty<KeyValuePair<Type, object>>();
+            var result = new KeyValuePair<Type, object>(typeof(T), InternalBuild(objects));
+            return AsyncEnumerable.Empty<KeyValuePair<Type, object>>().Append(result);
         }
-
-        protected abstract object InternalBuild(IEnumerable<object> stuff);
+        protected abstract object InternalBuild(IEnumerable<object> objects);
     }
 
     class ServiceProvidedBuilder<T> : BasedTypedInternalBuilder<T>
         where T : notnull
     {
-        protected override object InternalBuild(IEnumerable<object> stuff)
+        protected override object InternalBuild(IEnumerable<object> objects)
         {
-            var provider = stuff.OfType<IServiceProvider>().First();
+            var provider = objects.OfType<IServiceProvider>().First();
             return provider.GetRequiredService<T>();
         }
     }
@@ -49,7 +40,7 @@ public class ApplicationContextBuilder
             _instance = instance;
         }
 
-        protected override object InternalBuild(IEnumerable<object> stuff)
+        protected override object InternalBuild(IEnumerable<object> objects)
         {
             return _instance;
         }
@@ -57,6 +48,7 @@ public class ApplicationContextBuilder
 
     class FactoryBuilder<U, T> : BasedTypedInternalBuilder<T>
         where T : notnull
+        where U : notnull
     {
         Func<U, T> _factory;
 
@@ -68,12 +60,16 @@ public class ApplicationContextBuilder
         protected override object InternalBuild(IEnumerable<object> items)
         {
             var u = items.OfType<U>().First();
+            if( u is null) {
+                u = items.OfType<IServiceProvider>().First().GetRequiredService<U>();
+            }
             return _factory(u);
         }
     }
 
     class FactoryAsyncBuilder<U, T> : InternalBuilder
         where T : notnull
+        where U : notnull
     {
         Func<U, Task<T>> _factory;
 
@@ -82,14 +78,15 @@ public class ApplicationContextBuilder
             _factory = factory;
         }
 
-        public override async IAsyncEnumerable<KeyValuePair<Type, object>> BuildFor<T1>(IEnumerable<object> items)
+        public override async IAsyncEnumerable<KeyValuePair<Type, object>> BuildFor(IEnumerable<object> items)
         {
-            if (typeof(T1) == ShouldBuildFor)
-            {
-                var u = items.OfType<U>().First();
-                var t = await _factory(u);
-                yield return new KeyValuePair<Type, object>(typeof(T), t);
+            var u = items.OfType<U>().First();
+            if( u is null) {
+                u = items.OfType<IServiceProvider>().First().GetRequiredService<U>();
             }
+            var t = await _factory(u);
+            yield return new KeyValuePair<Type, object>(typeof(T), t);
+
         }
     }
 
@@ -101,112 +98,73 @@ public class ApplicationContextBuilder
             _builder = builder;
         }
 
-        public override async IAsyncEnumerable<KeyValuePair<Type, object>> BuildFor<T>(IEnumerable<object> stuff)
+        public override async IAsyncEnumerable<KeyValuePair<Type, object>> BuildFor(IEnumerable<object> objects)
         {
-            if (typeof(T) == ShouldBuildFor)
+            foreach (var kvp in await _builder.BuildInternalAsync(objects))
             {
-                foreach (var kvp in await _builder.BuildInternalAsync<T>(stuff))
-                {
-                    yield return kvp;
-                }
+                yield return kvp;
             }
         }
     }
 
-    Type myType = typeof(object);
-
     List<InternalBuilder> builders = new();
 
-    void AddInternal(InternalBuilder builder)
-    {
-        builders.Add(builder);
-        builder.ShouldBuildFor = myType;
-    }
-    public ApplicationContextBuilder Add<T>()
+    public ApplicationContextBuilder AddFromService<T>()
         where T : notnull
     {
-        AddInternal(new ServiceProvidedBuilder<T>());
+        builders.Add(new ServiceProvidedBuilder<T>());
         return this;
     }
 
     public ApplicationContextBuilder Add<T>(T instance)
         where T : notnull
     {
-        AddInternal(new InstanceBuilder<T>(instance));
+        builders.Add(new InstanceBuilder<T>(instance));
         return this;
-    }
-
-    public ApplicationContextBuilder Clone()
-    {
-        var builder = new ApplicationContextBuilder();
-        builder.builders.AddRange(builders);
-        return builder;
-    }
-
-    public void Merge(ApplicationContextBuilder builder)
-    {
-        builders.AddRange(builder.builders);
     }
 
     public void AddFactory<T, U>(Func<T, U> setupFunc)
         where U : notnull
+        where T : notnull
     {
-        AddInternal(new FactoryBuilder<T, U>(setupFunc));
+        builders.Add(new FactoryBuilder<T, U>(setupFunc));
     }
 
     public void AddAsyncFactory<T, U>(Func<T, Task<U>> setupFunc)
         where U : notnull
+        where T : notnull
     {
-        AddInternal(new FactoryAsyncBuilder<T, U>(setupFunc));
+        builders.Add(new FactoryAsyncBuilder<T, U>(setupFunc));
     }
 
-    void AddBuilderFor<T>(ApplicationContextBuilder builder)
+    public ApplicationContextBuilder AddBuilder(Action<ApplicationContextBuilder> builder)
     {
-        foreach (var b in builder.builders)
-        {
-            b.ShouldBuildFor = typeof(T);
-            builders.Add(b);
-        }
+        ApplicationContextBuilder myBuilder = new();
+        builder(myBuilder);
+        return AddBuilder(myBuilder);
     }
 
+    public ApplicationContextBuilder AddBuilder(ApplicationContextBuilder builder)
+    {
+        var nestedBuilder = new NestedBuilder(builder);
+        builders.Add(nestedBuilder);
+        return this;
+    }
 
-    async Task<ImmutableDictionary<Type, object>> BuildInternalAsync<T>(IEnumerable<object> uses)
+    async Task<ImmutableDictionary<Type, object>> BuildInternalAsync(IEnumerable<object> uses)
     {
         var kvps = await builders
             .ToAsyncEnumerable()
-            .SelectMany(b => b.BuildFor<T>(uses))
+            .SelectMany(b => b.BuildFor(uses))
             .ToDictionaryAsync(kvp => kvp.Key, kvp => kvp.Value);
         return kvps.ToImmutableDictionary();
     }
 
-
-
-    public async Task<ImmutableDictionary<Type, object>> BuildAsync<T>(IServiceProvider serviceProvider, params object[] uses)
+    public async Task<ImmutableDictionary<Type, object>> BuildAsync(IServiceProvider serviceProvider, params object[] objects)
     {
-        var all = uses.Prepend(serviceProvider);
-        return await BuildInternalAsync<T>(all);
+        var all = objects.Prepend(serviceProvider);
+        var dict =  await BuildInternalAsync(all);
+        return dict.Add(typeof(IServiceProvider), serviceProvider);
     }
 
-    public ApplicationContextBuilder WithBuilderFor<T>(Action<ApplicationContextBuilder> builder)
-    {
-        ApplicationContextBuilder myBuilder = new();
-        myBuilder.myType = typeof(T);
-        builder(myBuilder);
-        var nestedBuilder = new NestedBuilder(myBuilder);
-        nestedBuilder.ShouldBuildFor = myBuilder.myType;
-        builders.Add(nestedBuilder);
-        return this;
-    }
-
-    public ApplicationContextBuilder WithBuilderFor<T, TBuilder>(Action<TBuilder> builder)
-       where TBuilder : ApplicationContextBuilder, new()
-    {
-        TBuilder myBuilder = new();
-        myBuilder.myType = typeof(T);
-        builder(myBuilder);
-        var nestedBuilder = new NestedBuilder(myBuilder);
-        nestedBuilder.ShouldBuildFor = myBuilder.myType;
-        builders.Add(nestedBuilder);
-        return this;
-    }
 }

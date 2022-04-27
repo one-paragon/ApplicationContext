@@ -6,7 +6,7 @@ namespace OneParagon.Infrasctucture;
 public static class ApplicationContextStartupExtensions
 {
 
-    public static ApplicationContextBuilder AddApplicationContext(this IServiceCollection services, Action<ApplicationContextBuilder> applicationContextBuilder)
+    public static ApplicationContextBuilder AddDefaultApplicationContext(this IServiceCollection services, Action<ApplicationContextBuilder> applicationContextBuilder)
     {
         ApplicationContextBuilder builder = new();
         services.AddSingleton(builder);
@@ -16,19 +16,48 @@ public static class ApplicationContextStartupExtensions
 
     public static IApplicationBuilder UseApplicationContext(this IApplicationBuilder builder)
     {
-        return builder.UseMiddleware<ApplicationContextMiddleware>();
+        var defaultBuilder = builder.ApplicationServices.GetService<ApplicationContextBuilder>();
+        return builder.UseMiddleware<ApplicationContextMiddleware>(defaultBuilder);
     }
 
-    public static async Task UseDefaultApplicatonContext(this IHost host)
+
+    public static IApplicationBuilder UseApplicationContext(this IApplicationBuilder appBuilder, Action<ApplicationContextBuilder>? contextBuilder = null ) 
+    {
+        var  builder = appBuilder.MergeAllBuilders(contextBuilder);
+        
+        return appBuilder.UseMiddleware<ApplicationContextMiddleware>(builder);
+    }
+
+    public static ApplicationContextBuilder MergeAllBuilders(this IApplicationBuilder appBuilder, Action<ApplicationContextBuilder>? contextBuilder = null ) {
+        var existingBuilder = appBuilder.ApplicationServices.GetService<ApplicationContextBuilder>();
+
+        var builder = new ApplicationContextBuilder();
+
+        if(existingBuilder is not null) {
+            builder.AddBuilder(existingBuilder);
+        }
+
+        if(contextBuilder is not null) {
+            contextBuilder(builder);
+        }
+
+        return builder;
+    }
+
+    public static IApplicationBuilder UsePostAuthenticationApplicationContext(this IApplicationBuilder appBuilder, Action<ApplicationContextBuilder>? contextBuilder = null ) 
+    {
+        var builder = appBuilder.MergeAllBuilders(contextBuilder);        
+
+        return appBuilder.MapWhen( context => context.User.Identity?.IsAuthenticated ?? false, appBuilder => {
+            appBuilder.UseMiddleware<ApplicationContextMiddleware>(builder);
+        });
+    }
+
+    public static async Task InitDefaultApplicatonContext(this IHost host)
     {
         var builder = host.Services.GetRequiredService<ApplicationContextBuilder>();
-        var contextFeatures = await builder.BuildAsync<object>(host.Services);
+        var contextFeatures = await builder.BuildAsync(host.Services);
         ApplicationContext.DefaultFeatures = contextFeatures;
-    }
-
-    public static ApplicationContextBuilder WithMiddleware(this ApplicationContextBuilder contextBuilder, Action<ApplicationContextMiddlewareBuilder> middlewareBuilder)
-    {
-        return contextBuilder.WithBuilderFor<ApplicationContextMiddleware, ApplicationContextMiddlewareBuilder>(middlewareBuilder);
     }
 
 }

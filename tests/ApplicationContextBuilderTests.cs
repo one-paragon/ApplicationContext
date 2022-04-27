@@ -2,58 +2,97 @@ using Xunit;
 using System.Threading.Tasks;
 using OneParagon.Infrasctucture;
 using Microsoft.Extensions.DependencyInjection;
+using System;
 
 namespace tests;
 
 public class ApplicationContextBuilderTests
-{  
-
+{
     [Fact]
-    public async Task SimpleCaseWithBuilder()
-    {
+    public async Task ContextBuilder_AutoAdds_ServiceProvider() {
         var builder = new ApplicationContextBuilder();
-        builder.Add("hello");
         IServiceCollection sc = new ServiceCollection();
         var sp = sc.BuildServiceProvider();
-        var ctx = await builder.BuildAsync<object>(sp);
+
+        var ctx = await builder.BuildAsync(sp);
 
         ApplicationContext.SetFeatures(ctx);
 
+        Assert.Equal(sp,ApplicationContext.GetFeature<IServiceProvider>());
+    }
+
+    [Fact]
+    public async Task InstanceBuilder()
+    {
+        var builder = new ApplicationContextBuilder();
+
+        IServiceCollection sc = new ServiceCollection();
+        var sp = sc.BuildServiceProvider();
+
+
+        builder.Add("hello");
+        var ctx = await builder.BuildAsync(sp);
+        ApplicationContext.SetFeatures(ctx);
+        
         Assert.Equal("hello",ApplicationContext.GetFeature<string>());
     }
 
     [Fact]
-    public async Task BuilderWithDefault()
+    public async Task ServiceProvidedBuilder()
     {
         var builder = new ApplicationContextBuilder();
-        builder.Add("hello");
+
         IServiceCollection sc = new ServiceCollection();
+        sc.AddSingleton("hello");
         var sp = sc.BuildServiceProvider();
-        var ctx = await builder.BuildAsync<object>(sp);
 
-        ApplicationContext.DefaultFeatures = ctx;
 
+        builder.AddFromService<string>();
+        var ctx = await builder.BuildAsync(sp);
+        ApplicationContext.SetFeatures(ctx);
+        
         Assert.Equal("hello",ApplicationContext.GetFeature<string>());
     }
 
     [Fact]
-    public async Task MultipeBuildersDefault()
+    public async Task FactoryBuilder()
     {
         var builder = new ApplicationContextBuilder();
-        builder.Add("hello");
-        builder.WithBuilderFor<int>( builder => builder.Add("bye"));
+
         IServiceCollection sc = new ServiceCollection();
+        sc.AddSingleton("hello");
         var sp = sc.BuildServiceProvider();
-        var ctx = await builder.BuildAsync<object>(sp);
 
+
+        builder.AddFactory( (IServiceProvider sp) => sp.GetRequiredService<string>() );
+
+        var ctx = await builder.BuildAsync(sp);
         ApplicationContext.SetFeatures(ctx);
-
+        
         Assert.Equal("hello",ApplicationContext.GetFeature<string>());
-
-        ctx = await builder.BuildAsync<int>(sp);
-
-        ApplicationContext.SetFeatures(ctx);
-
-        Assert.Equal("bye",ApplicationContext.GetFeature<string>());
     }
+
+    [Fact]
+    public async Task AsyncFactoryBuilder()
+    {
+        var builder = new ApplicationContextBuilder();
+
+        IServiceCollection sc = new ServiceCollection();
+        sc.AddSingleton("hello");
+        var sp = sc.BuildServiceProvider();
+
+
+        builder.AddAsyncFactory( async (IServiceProvider sp) => {
+            await Task.Delay(1);
+            return sp.GetRequiredService<string>();
+        });
+        
+        var ctx = await builder.BuildAsync(sp);
+        ApplicationContext.SetFeatures(ctx);
+        
+        Assert.Equal("hello",ApplicationContext.GetFeature<string>());
+    }
+
+
+
 }

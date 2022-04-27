@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.30114.105
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "tests", "tests\tests.csproj", "{6FFB982F-5145-4E0B-8FCB-A3FA743B445C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ApplicationContext", "src\ApplicationContext.csproj", "{D6A2B8F8-123A-473A-8FB1-A64D4034A774}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OneParagon.ApplicationContext", "src\OneParagon.ApplicationContext.csproj", "{D6A2B8F8-123A-473A-8FB1-A64D4034A774}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

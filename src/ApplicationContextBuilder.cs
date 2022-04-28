@@ -6,6 +6,17 @@ namespace OneParagon.Infrasctucture;
 
 public class ApplicationContextBuilder
 {
+    static T ExtractType<T>(IEnumerable<object> objects)
+        where T : notnull
+    {
+        var t = objects.OfType<T>().FirstOrDefault();
+        if (t is null)
+        {
+            t = objects.OfType<IServiceProvider>().First().GetRequiredService<T>();
+        }
+        return t;
+    }
+
     abstract class InternalBuilder
     {
         public abstract IAsyncEnumerable<KeyValuePair<Type, object>> BuildFor(IEnumerable<object> objects);
@@ -59,10 +70,7 @@ public class ApplicationContextBuilder
 
         protected override object InternalBuild(IEnumerable<object> items)
         {
-            var u = items.OfType<U>().First();
-            if( u is null) {
-                u = items.OfType<IServiceProvider>().First().GetRequiredService<U>();
-            }
+            var u = ExtractType<U>(items);
             return _factory(u);
         }
     }
@@ -80,10 +88,7 @@ public class ApplicationContextBuilder
 
         public override async IAsyncEnumerable<KeyValuePair<Type, object>> BuildFor(IEnumerable<object> items)
         {
-            var u = items.OfType<U>().First();
-            if( u is null) {
-                u = items.OfType<IServiceProvider>().First().GetRequiredService<U>();
-            }
+            var u = ExtractType<U>(items);
             var t = await _factory(u);
             yield return new KeyValuePair<Type, object>(typeof(T), t);
 

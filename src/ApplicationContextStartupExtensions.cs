@@ -47,8 +47,7 @@ public static class ApplicationContextStartupExtensions
     public static IApplicationBuilder UsePostAuthenticationApplicationContext(this IApplicationBuilder appBuilder, Action<ApplicationContextBuilder>? contextBuilder = null ) 
     {
         var builder = appBuilder.MergeAllBuilders(contextBuilder);        
-
-        return appBuilder.MapWhen( context => context.User.Identity?.IsAuthenticated ?? false, appBuilder => {
+        return appBuilder.UseWhen( context => context.User.Identity?.IsAuthenticated ?? false, appBuilder => {
             appBuilder.UseMiddleware<ApplicationContextMiddleware>(builder);
         });
     }

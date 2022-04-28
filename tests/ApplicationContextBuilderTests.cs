@@ -93,6 +93,45 @@ public class ApplicationContextBuilderTests
         Assert.Equal("hello",ApplicationContext.GetFeature<string>());
     }
 
+  [Fact]
+    public async Task FactoryBuilderFromService()
+    {
+        var builder = new ApplicationContextBuilder();
+
+        IServiceCollection sc = new ServiceCollection();
+        sc.AddSingleton("hello");
+        var sp = sc.BuildServiceProvider();
+
+
+        builder.AddFactory( (string s) => s + " world" );
+
+        var ctx = await builder.BuildAsync(sp);
+        ApplicationContext.SetFeatures(ctx);
+        
+        Assert.Equal("hello world",ApplicationContext.GetFeature<string>());
+    }
+
+    [Fact]
+    public async Task AsyncFactoryBuilderFromService()
+    {
+        var builder = new ApplicationContextBuilder();
+
+        IServiceCollection sc = new ServiceCollection();
+        sc.AddSingleton("hello");
+        var sp = sc.BuildServiceProvider();
+
+
+        builder.AddAsyncFactory( async (string s) => {
+            await Task.Delay(1);
+            return  s + " world";
+        });
+        
+        var ctx = await builder.BuildAsync(sp);
+        ApplicationContext.SetFeatures(ctx);
+        
+        Assert.Equal("hello world",ApplicationContext.GetFeature<string>());
+    }
+
 
 
 }

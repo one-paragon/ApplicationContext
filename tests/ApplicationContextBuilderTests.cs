@@ -1,6 +1,6 @@
 using Xunit;
 using System.Threading.Tasks;
-using OneParagon.Infrasctucture;
+using OneParagon.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 

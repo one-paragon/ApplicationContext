@@ -2,7 +2,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace OneParagon.Infrasctucture;
+namespace OneParagon.Infrastructure;
+
 public static class ApplicationContextStartupExtensions
 {
 

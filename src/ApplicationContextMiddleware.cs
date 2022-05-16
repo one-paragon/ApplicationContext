@@ -2,7 +2,7 @@
 
 using Microsoft.AspNetCore.Http;
 
-namespace OneParagon.Infrasctucture;
+namespace OneParagon.Infrastructure;
 
 public class ApplicationContextMiddleware
 {

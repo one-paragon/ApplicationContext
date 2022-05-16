@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Http;
 
-namespace OneParagon.Infrasctucture;
+namespace OneParagon.Infrastructure;
 
 public class ApplicationContextBuilder
 {

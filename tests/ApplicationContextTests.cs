@@ -1,8 +1,6 @@
 using Xunit;
 using System.Threading.Tasks;
-using OneParagon.Infrasctucture;
-using Microsoft.Extensions.DependencyInjection;
-using System;
+using OneParagon.Infrastructure;
 
 namespace tests;
 

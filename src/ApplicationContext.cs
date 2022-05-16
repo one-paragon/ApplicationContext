@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 
-namespace OneParagon.Infrasctucture;
+namespace OneParagon.Infrastructure;
 
 public static class ApplicationContext
 {

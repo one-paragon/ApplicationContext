@@ -53,9 +53,16 @@ public static class ApplicationContextStartupExtensions
         });
     }
 
-    public static async Task InitDefaultApplicatonContext(this IHost host)
+    public static async Task InitDefaultApplicatonContext(this IHost host, Action<ApplicationContextBuilder>? contextBuilder = null )
     {
-        var builder = host.Services.GetRequiredService<ApplicationContextBuilder>();
+        var builder = new ApplicationContextBuilder();
+        var existingBuilder = host.Services.GetRequiredService<ApplicationContextBuilder>();
+        if(existingBuilder is not null) {
+            builder.AddBuilder(existingBuilder);
+        }
+        if(contextBuilder is not null) {
+            contextBuilder(builder);
+        }
         var contextFeatures = await builder.BuildAsync(host.Services);
         ApplicationContext.DefaultFeatures = contextFeatures;
     }

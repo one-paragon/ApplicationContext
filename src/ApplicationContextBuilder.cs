@@ -158,10 +158,14 @@ public class ApplicationContextBuilder
 
     async Task<ImmutableDictionary<Type, object>> BuildInternalAsync(IEnumerable<object> uses)
     {
-        var kvps = await builders
+        var items = await builders
             .ToAsyncEnumerable()
             .SelectMany(b => b.BuildFor(uses))
-            .ToDictionaryAsync(kvp => kvp.Key, kvp => kvp.Value);
+            .ToListAsync();
+
+        var kvps = items.GroupBy( kvp => kvp.Key, kvp => kvp.Value )
+            .ToDictionary( kvp => kvp.Key, kvp => kvp.Last() );
+
         return kvps.ToImmutableDictionary();
     }
 

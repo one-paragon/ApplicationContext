@@ -1,7 +1,9 @@
 using Xunit;
 using System.Threading.Tasks;
 using OneParagon.Infrastructure;
-using System.Collections.Immutable;
+using System.Threading;
+using System;
+using System.Collections.Generic;
 
 namespace tests;
 
@@ -134,12 +136,140 @@ public class ApplicationContextTests
     }
 
     [Fact]
-    public  void CaptureContext()
+    public void CaptureContext()
     {
         ApplicationContext.SetFeature("myFeature");
         ApplicationContext.SetKeyedFeature("key", new int[] { 1, 2, 3 });
 
         var result = ApplicationContext.CaptureContext();
-        Assert.Collection(result, (x)=> Assert.Equal("myFeature", x.Value), (x2)=> Assert.IsType<ImmutableDictionary<string, int[]>>(x2.Value));
+        Assert.Collection(result,
+            (x) => Assert.Equal("myFeature", x.Value),
+            (x2) => Assert.IsType<KeyValuePair<Type, object>>(x2)
+        );
+    }
+
+    [Fact]
+    public void WrapInContext_Task()
+    {
+        var stringToSetOnThread = "";
+
+        var task = async () =>
+        {
+            stringToSetOnThread = $"Feature from {ApplicationContext.GetFeature<string>()}";
+            await Task.CompletedTask;
+        };
+        var wrappedTask = () => Task.CompletedTask;
+        var context1 = new Thread(async () =>
+        {
+            ApplicationContext.SetFeature("context1");
+            wrappedTask = ApplicationContext.WrapInContext(task);
+            await wrappedTask();
+        });
+
+        var context2 = new Thread(async () =>
+        {
+            await wrappedTask();
+            stringToSetOnThread = $"{stringToSetOnThread} and executed on context2.";
+        });
+
+        context1.Start();
+        context1.Join();
+        Assert.Equal("Feature from context1", stringToSetOnThread);
+
+        context2.Start();
+        context2.Join();
+        Assert.Equal("Feature from context1 and executed on context2.", stringToSetOnThread);
+    }
+
+    [Fact]
+    public void WrapInContextT1_Output()
+    {
+        var task = () => Task.FromResult($"Feature from {ApplicationContext.GetFeature<string>()}");
+        var wrappedTask = () => Task.FromResult("");
+
+        var result = "";
+        var context1 = new Thread(async () =>
+        {
+            ApplicationContext.SetFeature("context1");
+            wrappedTask = ApplicationContext.WrapInContext(task);
+            result = await wrappedTask();
+        });
+
+        var context2 = new Thread(async () =>
+        {
+            var x = await wrappedTask();
+            result = $"{x} and executed on context2.";
+        });
+
+        context1.Start();
+        context1.Join();
+        Assert.Equal("Feature from context1", result);
+
+        context2.Start();
+        context2.Join();
+        Assert.Equal("Feature from context1 and executed on context2.", result);
+    }
+
+    [Fact]
+    public void WrapInContext_Input_Output()
+    {
+        var task = (string argument) => Task.FromResult($"Feature from {ApplicationContext.GetFeature<string>()} with input '{argument}'");
+        var wrappedTask = (string arg) => Task.FromResult(arg);
+
+        var result = "";
+        var context1 = new Thread(async () =>
+        {
+            ApplicationContext.SetFeature("context1");
+            wrappedTask = ApplicationContext.WrapInContext(task);
+            result = await wrappedTask("this is a context1 argument");
+        });
+
+        var context2 = new Thread(async () =>
+        {
+            var x = await wrappedTask("this is a context2 argument");
+            result = $"{x} and executed on context2.";
+        });
+
+        context1.Start();
+        context1.Join();
+        Assert.Equal("Feature from context1 with input 'this is a context1 argument'", result);
+
+        context2.Start();
+        context2.Join();
+        Assert.Equal("Feature from context1 with input 'this is a context2 argument' and executed on context2.", result);
+    }
+
+    [Fact]
+    public void WrapInContext_Input_Task()
+    {
+        var x = "";
+        var task = async (string argument) =>
+        {
+            x = $"Feature from {ApplicationContext.GetFeature<string>()} with input '{argument}'";
+            await Task.CompletedTask;
+        };
+        var wrappedTask = (string arg) => Task.CompletedTask;
+
+        var result = "";
+        var context1 = new Thread(async () =>
+        {
+            ApplicationContext.SetFeature("context1");
+            wrappedTask = ApplicationContext.WrapInContext(task);
+            await wrappedTask("this is a context1 argument");
+        });
+
+        var context2 = new Thread(async () =>
+        {
+            await wrappedTask("this is a context2 argument");
+            result = $"{x} and executed on context2.";
+        });
+
+        context1.Start();
+        context1.Join();
+        Assert.Equal("Feature from context1 with input 'this is a context1 argument'", x);
+
+        context2.Start();
+        context2.Join();
+        Assert.Equal("Feature from context1 with input 'this is a context2 argument' and executed on context2.", result);
     }
 }

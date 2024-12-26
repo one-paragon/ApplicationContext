@@ -9,11 +9,28 @@ public static class ApplicationContext
         _features = new();
     }
 
-    public static ImmutableDictionary<Type, object> DefaultFeatures {get;set;} = ImmutableDictionary<Type, object>.Empty;
+    public static ImmutableDictionary<Type, object> DefaultFeatures { get; set; } = ImmutableDictionary<Type, object>.Empty;
 
     private static ImmutableDictionary<Type, object> Features => _features.Value is null ? DefaultFeatures : _features.Value;
 
     private static AsyncLocal<ImmutableDictionary<Type, object>> _features;
+
+    public static void SetKeyedFeature<T>(string key, T value)
+    {
+        var dict = GetFeature<ImmutableDictionary<string, T>>() ?? ImmutableDictionary<string, T>.Empty;
+        dict = dict.SetItem(key, value);
+        SetFeature(dict);
+    }
+
+    public static T? GetKeyedFeature<T>(string key)
+    {
+        var dict = GetFeature<ImmutableDictionary<string, T>>();
+        if (dict == null) return default;
+        if (dict.TryGetValue(key, out var value)) return value;
+        return default;
+    }
+
+    public static ImmutableDictionary<Type, object> CaptureContext() => Features;
 
     public static void SetFeature<T>(T obj)
         where T : notnull

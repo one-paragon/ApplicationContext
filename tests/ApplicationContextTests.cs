@@ -159,10 +159,11 @@ public class ApplicationContextTests
             await Task.CompletedTask;
         };
         var wrappedTask = () => Task.CompletedTask;
-        var context1 = new Thread(() =>
+        var context1 = new Thread(async () =>
         {
             ApplicationContext.SetFeature("context1");
             wrappedTask = ApplicationContext.WrapInContext(task);
+            await wrappedTask();
         });
 
         var context2 = new Thread(async () =>
@@ -173,9 +174,10 @@ public class ApplicationContextTests
 
         context1.Start();
         context1.Join();
+        Assert.Equal("Feature from context1", stringToSetOnThread);
+
         context2.Start();
         context2.Join();
-
         Assert.Equal("Feature from context1 and executed on context2.", stringToSetOnThread);
     }
 
@@ -185,13 +187,14 @@ public class ApplicationContextTests
         var task = () => Task.FromResult($"Feature from {ApplicationContext.GetFeature<string>()}");
         var wrappedTask = () => Task.FromResult("");
 
-        var context1 = new Thread(() =>
+        var result = "";
+        var context1 = new Thread(async () =>
         {
             ApplicationContext.SetFeature("context1");
             wrappedTask = ApplicationContext.WrapInContext(task);
+            result = await wrappedTask();
         });
 
-        var result = "";
         var context2 = new Thread(async () =>
         {
             var x = await wrappedTask();
@@ -200,9 +203,10 @@ public class ApplicationContextTests
 
         context1.Start();
         context1.Join();
+        Assert.Equal("Feature from context1", result);
+
         context2.Start();
         context2.Join();
-
         Assert.Equal("Feature from context1 and executed on context2.", result);
     }
 
@@ -212,25 +216,27 @@ public class ApplicationContextTests
         var task = (string argument) => Task.FromResult($"Feature from {ApplicationContext.GetFeature<string>()} with input '{argument}'");
         var wrappedTask = (string arg) => Task.FromResult(arg);
 
-        var context1 = new Thread(() =>
+        var result = "";
+        var context1 = new Thread(async () =>
         {
             ApplicationContext.SetFeature("context1");
             wrappedTask = ApplicationContext.WrapInContext(task);
+            result = await wrappedTask("this is a context1 argument");
         });
 
-        var result = "";
         var context2 = new Thread(async () =>
         {
-            var x = await wrappedTask("this is my argument");
+            var x = await wrappedTask("this is a context2 argument");
             result = $"{x} and executed on context2.";
         });
 
         context1.Start();
         context1.Join();
+        Assert.Equal("Feature from context1 with input 'this is a context1 argument'", result);
+
         context2.Start();
         context2.Join();
-
-        Assert.Equal("Feature from context1 with input 'this is my argument' and executed on context2.", result);
+        Assert.Equal("Feature from context1 with input 'this is a context2 argument' and executed on context2.", result);
     }
 
     [Fact]
@@ -244,24 +250,26 @@ public class ApplicationContextTests
         };
         var wrappedTask = (string arg) => Task.CompletedTask;
 
-        var context1 = new Thread(() =>
+        var result = "";
+        var context1 = new Thread(async () =>
         {
             ApplicationContext.SetFeature("context1");
             wrappedTask = ApplicationContext.WrapInContext(task);
+            await wrappedTask("this is a context1 argument");
         });
 
-        var result = "";
         var context2 = new Thread(async () =>
         {
-            await wrappedTask("this is my argument");
+            await wrappedTask("this is a context2 argument");
             result = $"{x} and executed on context2.";
         });
 
         context1.Start();
         context1.Join();
+        Assert.Equal("Feature from context1 with input 'this is a context1 argument'", x);
+
         context2.Start();
         context2.Join();
-
-        Assert.Equal("Feature from context1 with input 'this is my argument' and executed on context2.", result);
+        Assert.Equal("Feature from context1 with input 'this is a context2 argument' and executed on context2.", result);
     }
 }

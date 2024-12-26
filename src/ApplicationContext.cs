@@ -30,7 +30,11 @@ public static class ApplicationContext
         return default;
     }
 
-    public static ImmutableDictionary<Type, object> CaptureContext() => Features;
+    public static ImmutableDictionary<Type, object> ResetContext()
+    {
+        SetFeatures(Features);
+        return Features;
+    }
 
     public static void SetFeature<T>(T obj)
         where T : notnull

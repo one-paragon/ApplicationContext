@@ -134,12 +134,12 @@ public class ApplicationContextTests
     }
 
     [Fact]
-    public  void CaptureContext()
+    public void ResetContext()
     {
         ApplicationContext.SetFeature("myFeature");
         ApplicationContext.SetKeyedFeature("key", new int[] { 1, 2, 3 });
 
-        var result = ApplicationContext.CaptureContext();
-        Assert.Collection(result, (x)=> Assert.Equal("myFeature", x.Value), (x2)=> Assert.IsType<ImmutableDictionary<string, int[]>>(x2.Value));
+        var result = ApplicationContext.ResetContext();
+        Assert.Collection(result, (x) => Assert.Equal("myFeature", x.Value), (x2) => Assert.IsType<ImmutableDictionary<string, int[]>>(x2.Value));
     }
 }

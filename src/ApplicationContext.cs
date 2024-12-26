@@ -30,10 +30,48 @@ public static class ApplicationContext
         return default;
     }
 
-    public static ImmutableDictionary<Type, object> ResetContext()
+    public static ImmutableDictionary<Type, object> CaptureContext() => Features;
+
+    public static void ResetContext(ImmutableDictionary<Type, object> features) => _features.Value = features;
+
+    public static Func<Task> WrapInContext(Func<Task> func)
     {
-        SetFeatures(Features);
-        return Features;
+        var capturedContext = CaptureContext();
+        return async () =>
+        {
+            ResetContext(capturedContext);
+            await func();
+        };
+    }
+
+    public static Func<Task<T1>> WrapInContext<T1>(Func<Task<T1>> func)
+    {
+        var capturedContext = CaptureContext();
+        return async () =>
+        {
+            ResetContext(capturedContext);
+            return await func();
+        };
+    }
+
+    public static Func<T1, Task<T2>> WrapInContext<T1, T2>(Func<T1, Task<T2>> func)
+    {
+        var capturedContext = CaptureContext();
+        return async (T1 t) =>
+        {
+            ResetContext(capturedContext);
+            return await func(t);
+        };
+    }
+
+    public static Func<T, Task> WrapInContext<T>(Func<T, Task> func)
+    {
+        var capturedContext = CaptureContext();
+        return async (T t) =>
+        {
+            ResetContext(capturedContext);
+            await func(t);
+        };
     }
 
     public static void SetFeature<T>(T obj)
